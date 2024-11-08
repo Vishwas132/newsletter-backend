@@ -29,12 +29,6 @@ export class Subscriber {
   })
   customFields: Record<string, any>;
 
-  @Column('text', {
-    name: 'gpg_public_key',
-    nullable: true,
-  })
-  gpgPublicKey: string | null;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

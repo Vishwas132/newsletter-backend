@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { Organization } from './organization.entity';
 import { Subscriber } from './subscriber.entity';
+import { SegmentRuleDto } from '../lists/dto/segment-rule.dto';
 
 @Entity('lists')
 export class List {
@@ -48,4 +49,10 @@ export class List {
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
+
+  @Column('jsonb', {
+    name: 'segment_rules',
+    nullable: true,
+  })
+  segmentRules: SegmentRuleDto[];
 }

@@ -46,7 +46,13 @@
     "pg": "^8.13.1",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "csv-parse": "^5.5.0",
+    "@types/multer": "^1.4.7",
+    "aws-sdk": "^2.1550.0",
+    "nodemailer": "^6.x.x",
+    "@types/nodemailer": "^6.4.14",
+    "@aws-sdk/client-ses": "^3.x.x"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

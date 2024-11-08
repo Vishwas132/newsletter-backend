@@ -10,6 +10,7 @@ export const getTypeOrmConfig = async (
   username: configService.get('DB_USERNAME', 'postgres'),
   password: configService.get('DB_PASSWORD', 'postgres'),
   database: configService.get('DB_NAME', 'newsletter'),
+  schema: configService.get('DB_SCHEMA', 'newsletter'),
   entities: [__dirname + '/../**/*.entity{.ts,.js}'],
   synchronize: configService.get('NODE_ENV', 'development') === 'development',
   logging: configService.get('NODE_ENV', 'development') === 'development',

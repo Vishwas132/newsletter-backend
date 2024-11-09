@@ -1,0 +1,608 @@
+{
+	"info": {
+		"_postman_id": "d0b66d31-dfaa-43aa-9fb6-828558384693",
+		"name": "Newsletter Backend API Collection",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "24271685"
+	},
+	"item": [
+		{
+			"name": "Authentication",
+			"item": [
+				{
+					"name": "Register User",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"securepassword\",\n    \"organizationId\": \"67267d6e-1632-49a9-93f4-c6ff06e4595e\",\n    \"role\": \"user\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/users/register",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"users",
+								"register"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Login User",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"// Stores the access token in an environment or global variable\r",
+									"// Stores the userId and organizationId in environment or global variables\r",
+									"const res = pm.response.json()\r",
+									"    console.log(pm.response.json())\r",
+									"var accessToken = res.access_token;\r",
+									"var userId = res.user.id;\r",
+									"var organizationId = res.user.organizationId;\r",
+									"var email = res.user.email\r",
+									"\r",
+									"pm.collectionVariables.set(\"news-accessToken\", accessToken);\r",
+									"pm.collectionVariables.set(\"news-userId\", userId);\r",
+									"pm.collectionVariables.set(\"news-organizationId\", organizationId);\r",
+									"pm.collectionVariables.set(\"news-email\", email)"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"user@example.com\",\n    \"password\": \"securepassword\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/users/login",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"users",
+								"login"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Organization Management",
+			"item": [
+				{
+					"name": "Create Organization",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Example Organization\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/organizations",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"organizations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Organizations",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/organizations",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"organizations"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Subscriber Management",
+			"item": [
+				{
+					"name": "Add Subscriber",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"email\": \"v.lekhwar123@gmail.com\",\n    \"organizationId\": \"{{news-organizationId}}\",\n    \"customFields\": {\n        \"firstName\": \"John\",\n        \"lastName\": \"Doe\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/subscribers?listId={{news-list-id}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"subscribers"
+							],
+							"query": [
+								{
+									"key": "listId",
+									"value": "{{news-list-id}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Subscribers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/subscribers?organizationId={{news-organizationId}}&page=1&limit=10",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"subscribers"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								},
+								{
+									"key": "page",
+									"value": "1"
+								},
+								{
+									"key": "limit",
+									"value": "10"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update Subscriber",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"customFields\": {\n        \"firstName\": \"Jane\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/subscribers/f23619ec-77e7-4c4f-97e0-06d4600b845d?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"subscribers",
+								"f23619ec-77e7-4c4f-97e0-06d4600b845d"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "List Management",
+			"item": [
+				{
+					"name": "Create List",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const res = pm.response.json()\r",
+									"\r",
+									"pm.collectionVariables.set(\"news-list-id\", res.id)"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Marketing List\",\n    \"organizationId\": \"{{news-organizationId}}\",\n    \"customFields\": {\n        \"industry\": \"Technology\"\n    }\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/lists",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"lists"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Lists",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/lists?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"lists"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update List",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"name\": \"Updated Marketing List\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/lists/{{news-list-id}}?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"lists",
+								"{{news-list-id}}"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Import Subscribers to List",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "file",
+									"type": "file",
+									"src": []
+								}
+							]
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/lists/{{news-list-id}}/import?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"lists",
+								"{{news-list-id}}",
+								"import"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Create List Segment",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"rules\": [\n        {\n            \"field\": \"customFields.industry\",\n            \"operator\": \"equals\",\n            \"value\": \"Technology\"\n        }\n    ]\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/lists/{{news-list-id}}/segment?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"lists",
+								"{{news-list-id}}",
+								"segment"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Campaign Management",
+			"item": [
+				{
+					"name": "Create Campaign",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"const res = pm.response.json()\r",
+									"\r",
+									"pm.collectionVariables.set(\"news-campaign-id\", res.id)"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"subject\": \"Monthly Newsletter\",\n    \"content\": \"Latest updates from our company\",\n    \"listId\": \"{{news-list-id}}\",\n    \"organizationId\": \"{{news-organizationId}}\"\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/campaigns",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"campaigns"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "List Campaigns",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/campaigns?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"campaigns"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Send Campaign",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/campaigns/{{news-campaign-id}}/send?organizationId={{news-organizationId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"campaigns",
+								"{{news-campaign-id}}",
+								"send"
+							],
+							"query": [
+								{
+									"key": "organizationId",
+									"value": "{{news-organizationId}}"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{news-accessToken}}",
+				"type": "string"
+			}
+		]
+	},
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "news-accessToken",
+			"value": ""
+		},
+		{
+			"key": "news-userId",
+			"value": ""
+		},
+		{
+			"key": "news-organizationId",
+			"value": ""
+		},
+		{
+			"key": "news-email",
+			"value": ""
+		},
+		{
+			"key": "news-list-id",
+			"value": ""
+		},
+		{
+			"key": "news-campaign-id",
+			"value": ""
+		}
+	]
+}

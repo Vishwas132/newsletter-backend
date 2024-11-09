@@ -3,12 +3,12 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
   UseGuards,
   ParseUUIDPipe,
+  Put,
 } from '@nestjs/common';
 import { SubscribersService } from './subscribers.service';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
@@ -17,19 +17,30 @@ import { QuerySubscriberDto } from './dto/query-subscriber.dto';
 import { JwtAuthGuard } from '../users/guards/jwt-auth.guard';
 import { OrganizationGuard } from '../users/guards/organization.guard';
 
-@Controller('api/subscribers')
+@Controller('/subscribers')
 @UseGuards(JwtAuthGuard, OrganizationGuard)
 export class SubscribersController {
   constructor(private readonly subscribersService: SubscribersService) {}
 
   @Post()
-  create(@Body() createSubscriberDto: CreateSubscriberDto) {
-    return this.subscribersService.create(createSubscriberDto);
+  create(
+    @Body() createSubscriberDto: CreateSubscriberDto,
+    @Query() query: { listId: string },
+  ) {
+    try {
+      return this.subscribersService.create(query.listId, createSubscriberDto);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Get()
   findAll(@Query() query: QuerySubscriberDto) {
-    return this.subscribersService.findAll(query);
+    try {
+      return this.subscribersService.findAll(query);
+    } catch (error) {
+      throw error;
+    }
   }
 
   @Get(':id')
@@ -37,10 +48,17 @@ export class SubscribersController {
     @Param('id', ParseUUIDPipe) id: string,
     @Query('organizationId', ParseUUIDPipe) organizationId: string,
   ) {
-    return this.subscribersService.findOne(id, organizationId);
+    try {
+      if (!id || !organizationId) {
+        throw new Error('Missing required parameters');
+      }
+      return this.subscribersService.findOne(id, organizationId);
+    } catch (error) {
+      throw error;
+    }
   }
 
-  @Patch(':id')
+  @Put(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
     @Query('organizationId', ParseUUIDPipe) organizationId: string,

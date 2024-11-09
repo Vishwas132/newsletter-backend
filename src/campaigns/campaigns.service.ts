@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -14,6 +15,8 @@ import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class CampaignsService {
+  private readonly logger = new Logger(CampaignsService.name);
+
   constructor(
     @InjectRepository(Campaign)
     private campaignsRepository: Repository<Campaign>,
@@ -24,23 +27,38 @@ export class CampaignsService {
   ) {}
 
   async create(createCampaignDto: CreateCampaignDto): Promise<Campaign> {
-    const list = await this.listsRepository.findOne({
-      where: {
-        id: createCampaignDto.listId,
+    try {
+      this.logger.log(`Creating campaign for list ${createCampaignDto.listId}`);
+
+      const list = await this.listsRepository.findOne({
+        where: {
+          id: createCampaignDto.listId,
+          organizationId: createCampaignDto.organizationId,
+        },
+      });
+
+      if (!list) {
+        this.logger.error(`List not found: ${createCampaignDto.listId}`);
+        throw new NotFoundException('List not found');
+      }
+
+      const campaign = this.campaignsRepository.create({
+        ...createCampaignDto,
         organizationId: createCampaignDto.organizationId,
-      },
-    });
+      });
 
-    if (!list) {
-      throw new NotFoundException('List not found');
+      const savedCampaign = await this.campaignsRepository.save(campaign);
+      this.logger.log(
+        `Campaign created successfully with ID: ${savedCampaign.id}`,
+      );
+      return savedCampaign;
+    } catch (error) {
+      this.logger.error(
+        `Failed to create campaign: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
-
-    const campaign = this.campaignsRepository.create({
-      ...createCampaignDto,
-      organizationId: createCampaignDto.organizationId,
-    });
-
-    return this.campaignsRepository.save(campaign);
   }
 
   async findAll(organizationId: string): Promise<Campaign[]> {
@@ -83,40 +101,67 @@ export class CampaignsService {
   }
 
   async send(id: string, organizationId: string): Promise<void> {
-    const campaign = await this.findOne(id, organizationId);
+    try {
+      this.logger.log(`Starting campaign send process for campaign ${id}`);
 
-    const list = await this.listsRepository.findOne({
-      where: {
-        id: campaign.listId,
-        organizationId: organizationId,
-      },
-      relations: ['subscribers'],
-    });
+      const campaign = await this.findOne(id, organizationId);
 
-    if (!list) {
-      throw new NotFoundException('List not found');
-    }
+      const list = await this.listsRepository.findOne({
+        where: {
+          id: campaign.listId,
+          organizationId: organizationId,
+        },
+        relations: ['subscribers'],
+      });
 
-    const subscribers = await this.listsService.getSegmentedSubscribers(
-      list.id,
-      organizationId,
-    );
-
-    if (subscribers.length === 0) {
-      throw new BadRequestException('No subscribers found in the list');
-    }
-
-    for (const subscriber of subscribers) {
-      try {
-        await this.emailService.sendEmail(
-          subscriber.email,
-          campaign.subject,
-          campaign.content,
-        );
-      } catch (error) {
-        // Log error or handle as needed
-        console.error(`Failed to send email to ${subscriber.email}`, error);
+      if (!list) {
+        this.logger.error(`List not found for campaign ${id}`);
+        throw new NotFoundException('List not found');
       }
+
+      const subscribers = await this.listsService.getSegmentedSubscribers(
+        list.id,
+        organizationId,
+      );
+
+      if (subscribers.length === 0) {
+        this.logger.warn(`No subscribers found for campaign ${id}`);
+        throw new BadRequestException('No subscribers found in the list');
+      }
+
+      this.logger.log(
+        `Sending campaign ${id} to ${subscribers.length} subscribers`,
+      );
+
+      let successCount = 0;
+      let failureCount = 0;
+
+      for (const subscriber of subscribers) {
+        try {
+          await this.emailService.sendEmail(
+            subscriber.email,
+            campaign.subject,
+            campaign.content,
+          );
+          successCount++;
+        } catch (error) {
+          failureCount++;
+          this.logger.error(
+            `Failed to send email to ${subscriber.email}: ${error.message}`,
+            error.stack,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Campaign ${id} completed. Success: ${successCount}, Failures: ${failureCount}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to send campaign ${id}: ${error.message}`,
+        error.stack,
+      );
+      throw error;
     }
   }
 }

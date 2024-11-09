@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
@@ -14,6 +15,8 @@ import { SegmentRuleDto } from './dto/segment-rule.dto';
 
 @Injectable()
 export class ListsService {
+  private readonly logger = new Logger(ListsService.name);
+
   constructor(
     @InjectRepository(List)
     private listsRepository: Repository<List>,
@@ -82,6 +85,9 @@ export class ListsService {
     organizationId: string,
   ): Promise<List> {
     const list = await this.findOne(listId, organizationId);
+    this.logger.debug(
+      `Adding subscriber ${subscriberId} to list ${listId} and organization ${organizationId}`,
+    );
     const subscriber = await this.subscribersRepository.findOne({
       where: {
         id: subscriberId,
@@ -93,12 +99,27 @@ export class ListsService {
       throw new NotFoundException('Subscriber not found');
     }
 
-    if (list.subscribers.some(sub => sub.id === subscriberId)) {
+    // Check if subscriber is already in the list using a query
+    const existingSubscriber = await this.listsRepository
+      .createQueryBuilder('list')
+      .innerJoin('list.subscribers', 'subscriber')
+      .where('list.id = :listId', { listId })
+      .andWhere('subscriber.id = :subscriberId', { subscriberId })
+      .getOne();
+
+    if (existingSubscriber) {
       throw new BadRequestException('Subscriber already in list');
     }
 
-    list.subscribers.push(subscriber);
-    return this.listsRepository.save(list);
+    // Use createQueryBuilder to add the subscriber to the list
+    await this.listsRepository
+      .createQueryBuilder()
+      .relation(List, 'subscribers')
+      .of(list)
+      .add(subscriber);
+
+    // Reload the list to get updated subscribers
+    return this.findOne(listId, organizationId);
   }
 
   async removeSubscriber(
@@ -107,9 +128,26 @@ export class ListsService {
     organizationId: string,
   ): Promise<List> {
     const list = await this.findOne(listId, organizationId);
+    const subscriber = await this.subscribersRepository.findOne({
+      where: {
+        id: subscriberId,
+        organization: { id: organizationId },
+      },
+    });
 
-    list.subscribers = list.subscribers.filter(sub => sub.id !== subscriberId);
-    return this.listsRepository.save(list);
+    if (!subscriber) {
+      throw new NotFoundException('Subscriber not found');
+    }
+
+    // Use createQueryBuilder to remove the subscriber from the list
+    await this.listsRepository
+      .createQueryBuilder()
+      .relation(List, 'subscribers')
+      .of(list)
+      .remove(subscriber);
+
+    // Reload the list to get updated subscribers
+    return this.findOne(listId, organizationId);
   }
 
   async importSubscribersFromCsv(
@@ -168,34 +206,87 @@ export class ListsService {
     listId: string,
     organizationId: string,
   ): Promise<Subscriber[]> {
-    const list = await this.findOne(listId, organizationId);
+    this.logger.debug(
+      `Getting segmented subscribers for list ${listId} and organization ${organizationId}`,
+    );
 
-    if (!list.segmentRules || list.segmentRules.length === 0) {
-      return list.subscribers;
+    const list = await this.listsRepository.findOne({
+      where: {
+        id: listId,
+        organization: { id: organizationId },
+      },
+    });
+
+    if (!list) {
+      throw new NotFoundException('List not found');
     }
 
-    return list.subscribers.filter(subscriber => {
-      return list.segmentRules.every(rule => {
-        const value = subscriber.customFields[rule.field];
+    // Simplified query using the junction table directly
+    const baseQuery = this.subscribersRepository
+      .createQueryBuilder('subscriber')
+      .innerJoin(
+        'list_subscribers',
+        'list_subscribers',
+        'list_subscribers.subscriber_id = subscriber.id',
+      )
+      .where('list_subscribers.list_id = :listId', { listId })
+      .andWhere('subscriber.organization_id = :organizationId', {
+        organizationId,
+      });
+
+    // If there are segment rules, apply them
+    if (list.segmentRules?.length) {
+      list.segmentRules.forEach((rule, index) => {
+        const paramName = `value${index}`;
+        const fieldPath = `subscriber.custom_fields->>'${rule.field}'`;
 
         switch (rule.operator) {
           case 'equals':
-            return value === rule.value;
+            baseQuery.andWhere(`${fieldPath} = :${paramName}`, {
+              [paramName]: rule.value,
+            });
+            break;
           case 'contains':
-            return value?.includes(rule.value);
+            baseQuery.andWhere(`${fieldPath} ILIKE :${paramName}`, {
+              [paramName]: `%${rule.value}%`,
+            });
+            break;
           case 'startsWith':
-            return value?.startsWith(rule.value);
+            baseQuery.andWhere(`${fieldPath} ILIKE :${paramName}`, {
+              [paramName]: `${rule.value}%`,
+            });
+            break;
           case 'endsWith':
-            return value?.endsWith(rule.value);
+            baseQuery.andWhere(`${fieldPath} ILIKE :${paramName}`, {
+              [paramName]: `%${rule.value}`,
+            });
+            break;
           case 'greaterThan':
-            return value > rule.value;
+            baseQuery.andWhere(`(${fieldPath})::numeric > :${paramName}`, {
+              [paramName]: rule.value,
+            });
+            break;
           case 'lessThan':
-            return value < rule.value;
-          default:
-            return false;
+            baseQuery.andWhere(`(${fieldPath})::numeric < :${paramName}`, {
+              [paramName]: rule.value,
+            });
+            break;
         }
       });
-    });
+    }
+
+    // Log the query for debugging
+    this.logger.debug('Generated SQL:', baseQuery.getSql());
+    this.logger.debug('Query parameters:', baseQuery.getParameters());
+
+    try {
+      const subscribers = await baseQuery.getMany();
+      this.logger.debug(`Found ${subscribers.length} subscribers`);
+      return subscribers;
+    } catch (error) {
+      this.logger.error('Error executing query:', error);
+      throw error;
+    }
   }
 
   async addSegmentRule(

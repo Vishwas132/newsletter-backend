@@ -5,8 +5,10 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
+  ManyToMany,
 } from 'typeorm';
 import { Organization } from './organization.entity';
+import { List } from './list.entity';
 
 @Entity('subscribers')
 export class Subscriber {
@@ -22,6 +24,9 @@ export class Subscriber {
   @ManyToOne(() => Organization)
   @JoinColumn({ name: 'organization_id' })
   organization: Organization;
+
+  @ManyToMany(() => List, list => list.subscribers)
+  lists: List[];
 
   @Column('jsonb', {
     name: 'custom_fields',

@@ -23,5 +23,5 @@ export class Organization {
   updatedAt: Date;
 
   @OneToMany(() => User, user => user.organization)
-  users: any[];
+  users: User[];
 }

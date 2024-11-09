@@ -33,7 +33,7 @@ export class List {
   })
   customFields: Record<string, any>;
 
-  @ManyToMany(() => Subscriber)
+  @ManyToMany(() => Subscriber, subscriber => subscriber.lists)
   @JoinTable({
     name: 'list_subscribers',
     joinColumn: {

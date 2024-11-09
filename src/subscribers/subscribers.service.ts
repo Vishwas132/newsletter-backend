@@ -2,73 +2,109 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { Subscriber } from '../entities/subscriber.entity';
 import { CreateSubscriberDto } from './dto/create-subscriber.dto';
 import { UpdateSubscriberDto } from './dto/update-subscriber.dto';
 import { QuerySubscriberDto } from './dto/query-subscriber.dto';
+import { ListsService } from 'src/lists/lists.service';
 
 @Injectable()
 export class SubscribersService {
+  private readonly logger = new Logger(SubscribersService.name);
   constructor(
     @InjectRepository(Subscriber)
     private subscribersRepository: Repository<Subscriber>,
+    private listsService: ListsService,
   ) {}
 
-  async create(createSubscriberDto: CreateSubscriberDto): Promise<Subscriber> {
-    // Check if subscriber already exists in the organization
-    const existingSubscriber = await this.subscribersRepository.findOne({
-      where: {
-        email: createSubscriberDto.email,
-        organization: { id: createSubscriberDto.organizationId },
-      },
-    });
+  async create(
+    listId: string,
+    createSubscriberDto: CreateSubscriberDto,
+  ): Promise<Subscriber> {
+    try {
+      this.logger.log(
+        `Creating subscriber for list ${listId} and organization ${createSubscriberDto.organizationId}, email: ${createSubscriberDto.email}, custom fields: ${JSON.stringify(createSubscriberDto.customFields)}`,
+      );
+      // Check if subscriber already exists in the organization
+      const existingSubscriber = await this.subscribersRepository.findOne({
+        where: {
+          email: createSubscriberDto.email,
+          organizationId: createSubscriberDto.organizationId,
+        },
+      });
 
-    if (existingSubscriber) {
+      if (existingSubscriber) {
+        throw new BadRequestException(
+          'Subscriber already exists in this organization',
+        );
+      }
+
+      let subscriber = this.subscribersRepository.create({
+        email: createSubscriberDto.email,
+        customFields: createSubscriberDto.customFields || {},
+        organizationId: createSubscriberDto.organizationId,
+      });
+
+      subscriber = await this.subscribersRepository.save(subscriber);
+      this.logger.debug(
+        `Subscriber created successfully with ID: ${JSON.stringify(subscriber)}`,
+      );
+
+      await this.listsService.addSubscriber(
+        listId,
+        subscriber.id,
+        createSubscriberDto.organizationId,
+      );
+
+      return subscriber;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException(
-        'Subscriber already exists in this organization',
+        'Failed to create subscriber: ' + error.message,
       );
     }
-
-    const subscriber = this.subscribersRepository.create({
-      email: createSubscriberDto.email,
-      customFields: createSubscriberDto.customFields || {},
-      organization: { id: createSubscriberDto.organizationId },
-    });
-
-    return this.subscribersRepository.save(subscriber);
   }
 
   async findAll(query: QuerySubscriberDto) {
-    const { organizationId, search, page, limit } = query;
+    try {
+      const { organizationId, search, page, limit } = query;
 
-    const queryBuilder = this.subscribersRepository
-      .createQueryBuilder('subscriber')
-      .leftJoinAndSelect('subscriber.organization', 'organization')
-      .where('organization.id = :organizationId', { organizationId });
+      const queryBuilder = this.subscribersRepository
+        .createQueryBuilder('subscriber')
+        .leftJoinAndSelect('subscriber.organization', 'organization')
+        .where('organization.id = :organizationId', { organizationId });
 
-    if (search) {
-      queryBuilder.andWhere('subscriber.email LIKE :search', {
-        search: `%${search}%`,
-      });
+      if (search) {
+        queryBuilder.andWhere('subscriber.email LIKE :search', {
+          search: `%${search}%`,
+        });
+      }
+
+      const [subscribers, total] = await queryBuilder
+        .skip((page - 1) * limit)
+        .take(limit)
+        .getManyAndCount();
+
+      return {
+        data: subscribers,
+        meta: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit),
+        },
+      };
+    } catch (error) {
+      throw new BadRequestException(
+        'Failed to fetch subscribers: ' + error.message,
+      );
     }
-
-    const [subscribers, total] = await queryBuilder
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
-
-    return {
-      data: subscribers,
-      meta: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    };
   }
 
   async findOne(id: string, organizationId: string): Promise<Subscriber> {
@@ -92,19 +128,46 @@ export class SubscribersService {
     organizationId: string,
     updateSubscriberDto: UpdateSubscriberDto,
   ): Promise<Subscriber> {
-    const subscriber = await this.findOne(id, organizationId);
+    try {
+      const subscriber = await this.findOne(id, organizationId);
 
-    // Create a new object for the update
-    const updateData: Partial<Subscriber> = {
-      ...updateSubscriberDto,
-      customFields: updateSubscriberDto.customFields
-        ? updateSubscriberDto.customFields
-        : subscriber.customFields,
-    };
+      if (updateSubscriberDto.email) {
+        // Check if new email already exists for another subscriber
+        const existingSubscriber = await this.subscribersRepository.findOne({
+          where: {
+            email: updateSubscriberDto.email,
+            organization: { id: organizationId },
+            id: Not(id), // Exclude current subscriber
+          },
+        });
 
-    // Merge and save
-    Object.assign(subscriber, updateData);
-    return this.subscribersRepository.save(subscriber);
+        if (existingSubscriber) {
+          throw new BadRequestException(
+            'Email already exists in this organization',
+          );
+        }
+      }
+
+      const updateData: Partial<Subscriber> = {
+        ...updateSubscriberDto,
+        customFields: updateSubscriberDto.customFields
+          ? updateSubscriberDto.customFields
+          : subscriber.customFields,
+      };
+
+      Object.assign(subscriber, updateData);
+      return await this.subscribersRepository.save(subscriber);
+    } catch (error) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
+        throw error;
+      }
+      throw new BadRequestException(
+        'Failed to update subscriber: ' + error.message,
+      );
+    }
   }
 
   async remove(id: string, organizationId: string): Promise<void> {
@@ -113,6 +176,7 @@ export class SubscribersService {
   }
 
   async bulkImport(
+    listId: string,
     organizationId: string,
     subscribers: CreateSubscriberDto[],
   ): Promise<{
@@ -128,7 +192,7 @@ export class SubscribersService {
 
     for (const subscriber of subscribers) {
       try {
-        await this.create({ ...subscriber, organizationId });
+        await this.create(listId, { ...subscriber, organizationId });
         results.success++;
       } catch (error) {
         results.failed++;

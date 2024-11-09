@@ -3,6 +3,8 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
+  UnauthorizedException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
@@ -11,29 +13,41 @@ export class OrganizationGuard implements CanActivate {
   constructor(private reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-    const organizationId =
-      request.query.organizationId || request.body.organizationId;
+    try {
+      const request = context.switchToHttp().getRequest();
+      const user = request.user;
 
-    // If no organization ID is provided in the request, allow the request
-    // This is useful for super admin routes that don't require organization context
-    if (!organizationId) {
+      if (!user) {
+        throw new UnauthorizedException('User not authenticated');
+      }
+
+      const organizationId =
+        request.query.organizationId || request.body.organizationId;
+
+      if (!organizationId) {
+        return true;
+      }
+
+      if (user.role === 'SUPERADMIN') {
+        return true;
+      }
+
+      if (user.organizationId !== organizationId) {
+        throw new ForbiddenException(
+          'You do not have access to this organization',
+        );
+      }
+
       return true;
+    } catch (error) {
+      console.error('Organization guard error:', error);
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof ForbiddenException
+      ) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Authorization check failed');
     }
-
-    // Super admins can access all organizations
-    if (user.role === 'SUPERADMIN') {
-      return true;
-    }
-
-    // Check if the user belongs to the requested organization
-    if (user.organizationId !== organizationId) {
-      throw new ForbiddenException(
-        'You do not have access to this organization',
-      );
-    }
-
-    return true;
   }
 }

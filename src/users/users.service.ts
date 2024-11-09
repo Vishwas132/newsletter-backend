@@ -37,16 +37,21 @@ export class UsersService {
       // Hash password
       const passwordHash = await bcrypt.hash(createUserDto.password, 10);
 
-      const user = this.usersRepository.create({
-        ...createUserDto,
-        passwordHash,
-      });
+      const user = this.usersRepository.create([
+        {
+          ...createUserDto,
+          passwordHash,
+        },
+      ]);
 
       // // Explicitly type the save operation to return a single User
-      // const savedUser = await this.usersRepository.save(user);
-      this.logger.log(`User created successfully with ID: ${user[0].id}`);
+      const savedUser = await this.usersRepository.save(user);
+      this.logger.log(
+        `User created successfully with ID: ${JSON.stringify(savedUser)}`,
+      );
+      this.logger.log(`User created successfully with ID: ${savedUser[0].id}`);
 
-      return user[0];
+      return savedUser[0];
     } catch (error) {
       this.logger.error(`Failed to create user: ${error.message}`, error.stack);
       throw error;
